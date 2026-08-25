@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import emailjs from '@emailjs/browser';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowRight, CheckCircle2, Download, FileOutput, HelpCircle, LoaderCircle, LockKeyhole, RotateCcw, Search, ShieldCheck, Sparkles, UploadCloud } from 'lucide-react';
 import { tools, getTool, type Tool, type ToolId } from '@/config/tools';
@@ -24,5 +25,146 @@ function ConverterPage({ tool }: { tool: Tool }) { const [files, setFiles] = use
 function Result({ result, original, onReset }: { result: Awaited<ReturnType<typeof convert>>; original: File; onReset: () => void }) { const download = (blob: Blob, name: string) => { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = name; a.click(); URL.revokeObjectURL(url); }; return <div className="result-box"><CheckCircle2 className="success-icon" size={30}/><h2>Conversion Complete</h2><p>Your file is ready to download.</p>{result.files && result.files.length > 1 ? <div className="result-files">{result.files.map((item) => <button key={item.filename} className="download-row" onClick={() => download(item.blob, item.filename)}><span>{item.filename}</span><Download size={17}/></button>)}</div> : <div className="result-file"><div><small>Original file</small><b>{original.name}</b></div><div><small>Output file</small><b>{result.filename}</b></div></div>}<div className="result-actions"><button className="button-primary" onClick={() => download(result.outputFile!, result.filename!)}><Download size={18}/> Download File</button><button className="button-ghost" onClick={onReset}><RotateCcw size={17}/> Convert Another</button></div></div>; }
 function ToolContent({ tool }: { tool: Tool }) { const related = tools.filter((item) => item.id !== tool.id && (item.category === tool.category || item.inputTypes.some((x) => tool.inputTypes.includes(x)))).slice(0,4); return <section className="tool-content"><div><h2>How to use our {tool.name.toLowerCase()} converter</h2><ol><li>Upload your {tool.inputTypes.join(' or ')} file{tool.multiple ? 's' : ''}.</li><li>Start the conversion and let FileNova process your files.</li><li>Download your {tool.outputType} result when it is ready.</li></ol><h2>Why use FileNova?</h2><p>FileNova makes everyday file work straightforward: clear tools, no registration, and no account history. Operations that need a server conversion engine are labeled honestly rather than producing an unreliable placeholder file.</p><h2>Frequently Asked Questions</h2><details><summary>Is FileNova free to use?</summary><p>Yes. The first release is designed as a free, no-account file utility platform.</p></details><details><summary>Are my files saved?</summary><p>No user account or permanent file history is created. Browser-side operations stay in the current session.</p></details></div><div className="related"><h3>Related Tools</h3>{related.map((item) => <Link key={item.id} to={item.route}>{item.name}<ArrowRight size={16}/></Link>)}</div></section>; }
 
-export function SimplePage({ type }: { type: 'about'|'privacy'|'terms'|'contact' }) { const content = { about: ['About FileNova','FileNova provides simple online tools for converting and managing documents without requiring registration. Our goal is to make routine file tasks feel clear, focused, and approachable.'], privacy: ['Privacy','FileNova does not create user accounts or conversion history. Files processed in your browser remain available only to the current session. Future server processing will use temporary files and should remove inputs and outputs after the operation completes. Do not upload confidential material until the relevant server processing is connected and independently reviewed.'], terms: ['Terms','FileNova is provided as a free utility platform. You are responsible for the files you choose to process and for checking the output before relying on it. Tools that require a server conversion engine may be unavailable until that service is connected.'], contact: ['Contact','We would like to hear from you. This form is ready to connect to an email service, but it does not send messages yet.'] }[type]; return <div className="shell page-space narrow-page"><span className="kicker">FILENOVA</span><h1>{content[0]}</h1><p className="lead">{content[1]}</p>{type === 'contact' && <form className="contact-form" onSubmit={(e) => e.preventDefault()}><label>Name<input className="text-input" required/></label><label>Email<input className="text-input" type="email" required/></label><label>Message<textarea className="text-input" rows={6} required/></label><p className="field-help">Sending is not enabled yet. Your message will not be submitted.</p><button className="button-primary" type="submit">Send Message <ArrowRight size={17}/></button></form>}</div>; }
-function NotFound() { return <div className="shell page-space narrow-page"><h1>Page not found</h1><p className="lead">The page you are looking for does not exist.</p><Link to="/tools" className="button-primary">Browse all tools</Link></div>; }
+export function SimplePage({ type }: { type: 'about'|'privacy'|'terms'|'contact' }) {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [message, setMessage] = useState('');
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState('');
+
+  const content = {
+    about: [
+      'About FileNova',
+      'FileNova provides simple online tools for converting and managing documents without requiring registration. Our goal is to make routine file tasks feel clear, focused, and approachable.'
+    ],
+    privacy: [
+      'Privacy',
+      'FileNova does not create user accounts or conversion history. Files processed in your browser remain available only to the current session. Future server processing will use temporary files and should remove inputs and outputs after the operation completes. Do not upload confidential material until the relevant server processing is connected and independently reviewed.'
+    ],
+    terms: [
+      'Terms',
+      'FileNova is provided as a free utility platform. You are responsible for the files you choose to process and for checking the output before relying on it. Tools that require a server conversion engine may be unavailable until that service is connected.'
+    ],
+    contact: [
+      'Contact',
+      'We would like to hear from you. Send us a message and we will receive it at our support email.'
+    ]
+  }[type];
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    if (sending) return;
+
+    setSending(true);
+    setSent(false);
+    setError('');
+
+    try {
+      await emailjs.send(
+        'service_4n8g6jv',
+        'template_brxkyyf',
+        {
+          name,
+          email,
+          message,
+          title: 'FileNova Contact',
+          time: new Date().toLocaleString()
+        },
+        {
+          publicKey: '9QLN3rOjWkC-xp_uL'
+        }
+      );
+
+      setSent(true);
+      setName('');
+      setEmail('');
+      setMessage('');
+    } catch (err) {
+      console.error('EmailJS error:', err);
+      setError('Sorry, your message could not be sent. Please try again.');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="shell page-space narrow-page">
+      <span className="kicker">FILENOVA</span>
+      <h1>{content[0]}</h1>
+      <p className="lead">{content[1]}</p>
+
+      {type === 'contact' && (
+        <form className="contact-form" onSubmit={handleSubmit}>
+          <label>
+            Name
+            <input
+              className="text-input"
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+            />
+          </label>
+
+          <label>
+            Email
+            <input
+              className="text-input"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </label>
+
+          <label>
+            Message
+            <textarea
+              className="text-input"
+              rows={6}
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              required
+            />
+          </label>
+
+          {sent && (
+            <p className="field-help" style={{ color: '#16a34a' }}>
+              Message sent successfully. Thank you for contacting FileNova.
+            </p>
+          )}
+
+          {error && (
+            <p className="field-help" style={{ color: '#dc2626' }}>
+              {error}
+            </p>
+          )}
+
+          <button
+            className="button-primary"
+            type="submit"
+            disabled={sending}
+          >
+            {sending ? 'Sending...' : 'Send Message'}
+            {!sending && <ArrowRight size={17} />}
+          </button>
+        </form>
+      )}
+    </div>
+  );
+}
+function NotFound() {
+  return (
+    <div className="shell page-space narrow-page">
+      <h1>Page not found</h1>
+      <p className="lead">
+        The page you are looking for does not exist.
+      </p>
+      <Link to="/tools" className="button-primary">
+        Browse all tools
+      </Link>
+    </div>
+  );
+}
